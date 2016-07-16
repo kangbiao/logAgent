@@ -11,6 +11,10 @@ process(){
 	offsetFile=$3
 	ruleArr=$4
 	sed -n "${offsetStart},${offsetEnd}"p $offsetFile  | grep "dealName"
+
+	sql="insert into table values('${filsds[0]}','${filsds[0]}')"
+
+	mysql -h127.0.0.1 -uroot -proot -P3306 -e "${sql}"
 }
 
 
@@ -30,16 +34,16 @@ while watchInfo=`inotifywait -q --format '%e %f' -e modify,create ${configArr['l
 	offsetInfo=`cat ${configArr['offsetFilePath']}`
 
 	# 如果偏移量文件不存在，则创建偏移量文件
-	if [[ $? ]]; then
+	if [ $? ]; then
 
 		# 如果偏移量记录文件为空，则初始化偏移量，从第0行读取变更的文件
-		if [[ $offsetInfo=="" ]]; then
+		if [ $offsetInfo -eq "" ]; then
 			process 1 ${lines} $watchInfo[1]
 
 		# 如果偏移量文件不为空，则取出偏移量和指向的文件
 		else
 			offsetInfo=($offsetInfo)
-			if [[ ${offsetInfo[1]}!=${watchInfo[1]} ]]; then
+			if [ ${offsetInfo[1]} -eq ${watchInfo[1]} ]; then
 				# 处理上一个日志文件
 				process ${offset} $ $offsetFile 
 
@@ -56,4 +60,9 @@ while watchInfo=`inotifywait -q --format '%e %f' -e modify,create ${configArr['l
 		touch ${configArr['offsetFilePath']}
 	fi
 done
+
+
+
+
+
 
