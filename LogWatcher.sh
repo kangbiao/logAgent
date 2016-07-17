@@ -38,6 +38,9 @@ process(){
 	offsetFile=$3
 	configArr=$4
  
+ 	# 可用的分析规则
+	sed -n "1,$ {/qcloud\.Delivery\.checkStatus/{s/\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*eventId[^0-9]*\([0-9]*\).*\)\]/insert into tLog (time,eventid) values(\'\1\',\'\2\',\'\3\',\'\4\',\'\5\',\'\6\')/gp;}}"
+
 
 	sed -n '1,2{/dealName/{s/a/k/p;}}'
 	sed "s/\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*eventId[^0-9]*\([0-9]*\).*\)\]/insert into tLog (time,eventid) values(\'\1\',\'\2\',\'\3\',\'\4\',\'\5\',\'\6\')/g"
