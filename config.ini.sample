@@ -4,10 +4,4 @@ logCategoryPath=/data/log/trade/
 
 offsetFilePath=/data/log/offset
 
-reportType=database
-
-rules=.*
-
-database=mysql -h127.0.0.1 -P3306 -uroot -proot -dlogCenter -tlog_trade
-
-interface=
+rules=qcloud\.Delivery\.checkStatus
