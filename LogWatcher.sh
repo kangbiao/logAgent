@@ -23,7 +23,7 @@ process(){
   offsetEnd=$2
   offsetFile=$3
   configArr=$4
- 
+echo "$offsetStart $offsetEnd $offsetFile ${configArr['rules']}" 
   OLD_IFS="$IFS" 
   IFS="@" 
   sed -n "${offsetStart},${offsetEnd} {/${configArr['rules']}/{s/\[\([^,]*\).*\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]/\1@\2@\3@\4@\5/gp;}}" ${offsetFile} | while read line
@@ -34,12 +34,12 @@ process(){
     if [ $length -eq 5 ]; then
       for ((i=0; i<$length; i++))
       do
-        if [ $i!=5 ]; then
+        if [ $i -lt 4 ]; then
           sql=${sql}" '${arr[$i]}',"
         else
           dealName=`echo ${arr[$i]} | sed -n 's/.*dealName[^0-9]*\([0-9]*\).*/\1/gp'`
           eventId=`echo ${arr[$i]} | sed -n 's/.*eventId[^0-9]*\([0-9]*\).*/\1/gp'`
-          sql=${sql}"'${arr[$i]}','${dealName}','${eventId}';"
+          sql=${sql}"'${arr[$i]}','${dealName}','${eventId}');"
         fi
       done
     fi
@@ -51,41 +51,47 @@ process(){
 
 
 configFile=$1
-declare -a configArr
-
+declare -A configArr
 while IFS='' read -r line || [[ -n "$line" ]]; do
    IFS='=' read -r key value <<< "$line"
+   echo $key"and"$value
    configArr[$key]=$value
 done < "$configFile"
 
 echo -e "parse config file succ \n\nstart watch log[log path:${configArr['logCategoryPath']}]\n"
-
+echo ${configArr['offsetFilePath']}"and"${configArr['rules']}
 while watchInfo=`inotifywait -q --format '%e %f' -e modify,create ${configArr['logCategoryPath']}`;do
+    
   watchInfo=($watchInfo)
+  echo ${watchInfo[1]}|grep -q "^trade.*"
+  if [ ! $? -eq 0 ];then
+    continue
+  fi
+  watchInfo[1]=${configArr['logCategoryPath']}""${watchInfo[1]}
   lines=`wc -l ${watchInfo[1]}`
   lines=($lines)
   lines=${lines[0]}
   offsetInfo=`cat ${configArr['offsetFilePath']}`
-
   # 如果偏移量文件不存在，则创建偏移量文件
   if [ $? ]; then
 
     # 如果偏移量记录文件为空，则初始化偏移量，从第0行读取变更的文件
-    if [ $offsetInfo == "" ]; then
-      process 1 ${lines} $watchInfo[1] $configArr
+    if [ "$offsetInfo" = "" ]; then
+      process 1 ${lines} ${watchInfo[1]} $configArr
 
     # 如果偏移量文件不为空，则取出偏移量和指向的文件
     else
       offsetInfo=($offsetInfo)
-      if [ ${offsetInfo[1]} != ${watchInfo[1]} ]; then
+      offsetInfo[0]=` expr ${offsetInfo[0]} + 1`
+      if [ ! "${offsetInfo[1]}" = "${watchInfo[1]}" ]; then
         # 处理上一个日志文件
-        process ${offset} $ $offsetFile $configArr
+        process ${offsetInfo[0]} $ ${offsetInfo[1]} $configArr
 
         # 处理从第0行开始处理新创建的文件
         process 1 ${lines} $watchInfo[1] $configArr
       else
         # 继续处理偏移量文件中记录的文件
-        process ${offset} ${lines} $watchInfo[1] $configArr
+        process ${offsetInfo[0]} ${lines} ${watchInfo[1]} $configArr
       fi
     fi
     # 处理完成，更新偏移量和指向的文件
