@@ -1,7 +1,5 @@
-# 脚本配置
-
 logCategoryPath=/data/log/trade/
-
 offsetFilePath=/data/log/offset
-
-rules=qcloud\.Delivery\.checkStatus
+tempSqlFilePath=/data/log/sql.temp
+rules=\(common\/protocol\/Protocol\.class\.php\:unpack\|common\/net\/HTTP\.class\.php\:send\).*
+maxSqlLinesTosave=100

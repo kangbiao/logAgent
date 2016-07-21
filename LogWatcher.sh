@@ -23,30 +23,47 @@ process(){
   offsetEnd=$2
   offsetFile=$3
   configArr=$4
-echo "$offsetStart $offsetEnd $offsetFile ${configArr['rules']}" 
+  # echo "$offsetStart $offsetEnd $offsetFile ${configArr['rules']}" 
   OLD_IFS="$IFS" 
   IFS="@" 
-  sed -n "${offsetStart},${offsetEnd} {/${configArr['rules']}/{s/\[\([^,]*\).*\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]\[\(.*\)\]/\1@\2@\3@\4@\5/gp;}}" ${offsetFile} | while read line
+  sed -n "${offsetStart},${offsetEnd} {/${configArr['rules']}/{s/@/#/g;s/'/\"/g;s/\[\([^,]*\),[0-9]*\]\[\([^]]*\)\]\[\([^]]*\)\]\[\([^]]*\)\]\[\(.*\)\]/\2@\4@\5/gp;}}" ${offsetFile} | while read line
   do
-    sql="insert into () values("
+    sql="insert into t_log_deal (module,ip,level,extKey1,path,content,extKey2,eventId,uin,appId) values('trade','10.250.128.232',1,"
     arr=($line)
     length=${#arr[@]}
-    if [ $length -eq 5 ]; then
+    if [ $length -eq 3 ]; then
       for ((i=0; i<$length; i++))
       do
-        if [ $i -lt 4 ]; then
-          sql=${sql}" '${arr[$i]}',"
-        else
+        if [ $i -eq 2 ];then
           dealName=`echo ${arr[$i]} | sed -n 's/.*dealName[^0-9]*\([0-9]*\).*/\1/gp'`
           eventId=`echo ${arr[$i]} | sed -n 's/.*eventId[^0-9]*\([0-9]*\).*/\1/gp'`
-          sql=${sql}"'${arr[$i]}','${dealName}','${eventId}');"
+          ownerUin=`echo ${arr[$i]} | sed -n 's/.*ownerUin[^0-9]*\([0-9]*\).*/\1/gp'`
+          appId=`echo ${arr[$i]} | sed -n 's/.*appId[^0-9]*\([0-9]*\).*/\1/gp'`
+          if [ "$eventId" = "" ];then
+            eventId=0
+          fi 
+          if [ "$ownerUin" = "" ];then
+            ownerUin=0
+          fi 
+          if [ "$appId" = "" ];then
+            appId=0
+          fi 
+          sql=${sql}"'${arr[$i]}','${dealName}','${eventId}','${ownerUin}','${appId}');"
+        else
+          sql=${sql}" '${arr[$i]}',"
         fi
       done
     fi
     echo $sql>>./sql.temp
   done
   IFS="$OLD_IFS" 
-  # mysql -h127.0.0.1 -uroot -proot -P3306 -e ./sql.temp
+  sqlLines=`wc -l ${configArr['tempSqlFilePath']}`
+  sqlLines=($sqlLines)
+  sqlLines=${sqlLines[0]}
+  if [ $sqlLines -ge ${configArr['maxSqlLinesTosave']} ]; then
+     mysql -h10.249.50.199 -uroot -P15646 -pucT_812WQb -Dlogcenter < ${configArr['tempSqlFilePath']}
+     rm ${configArr['tempSqlFilePath']}
+  fi
 }
 
 
@@ -71,9 +88,12 @@ while watchInfo=`inotifywait -q --format '%e %f' -e modify,create ${configArr['l
   lines=`wc -l ${watchInfo[1]}`
   lines=($lines)
   lines=${lines[0]}
-  offsetInfo=`cat ${configArr['offsetFilePath']}`
+  if [ $lines -lt 1 ];then
+    continue
+  fi
   # 如果偏移量文件不存在，则创建偏移量文件
-  if [ $? ]; then
+  if [ -e ${configArr['offsetFilePath']} ]; then
+    offsetInfo=`cat ${configArr['offsetFilePath']}`
 
     # 如果偏移量记录文件为空，则初始化偏移量，从第0行读取变更的文件
     if [ "$offsetInfo" = "" ]; then
